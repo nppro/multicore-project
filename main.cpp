@@ -24,7 +24,7 @@ int main(int argc, char** argv) {
     
     if (rank == 0) {
         std::cout << "\n╔════════════════════════════════════════════════╗" << std::endl;
-        std::cout << "║  MPI Traffic Flow Simulation                  ║" << std::endl;
+        std::cout << "║  MPI Traffic Flow Simulation                x`  ║" << std::endl;
         std::cout << "║  With Ambulance Priority & Train Crossings    ║" << std::endl;
         std::cout << "╚════════════════════════════════════════════════╝\n" << std::endl;
     }
