@@ -272,4 +272,4 @@ traffic_simulation/
 **Course:** Multicore Programming
 **Institution:** University of Europe for Applied Sciences, Potsdam
 
-Good luck with your research! 🚗🚑🚶‍♂️🚆 
+Good luck with your research! 🚗🚑🚶‍♂️🚆   
