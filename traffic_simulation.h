@@ -73,6 +73,7 @@ private:
     MPI_Win shared_window;
     int* shared_memory;
     
+    
     // Random number generator
     std::mt19937 rng;
     std::uniform_real_distribution<double> dist;
@@ -80,7 +81,7 @@ private:
 public:
     TrafficController(int _rank, int _size, int _num_segments);
     ~TrafficController();
-    
+    void cleanup();
     // Core functions
     void initialize();
     void run_simulation(int iterations);
@@ -121,4 +122,9 @@ struct SimulationStats {
                        total_execution_time(0.0) {}
 };
 
+
+
+
 #endif // TRAFFIC_SIMULATION_H
+
+

@@ -25,7 +25,7 @@ TrafficController::TrafficController(int _rank, int _size, int _num_segments)
 // Destructor
 TrafficController::~TrafficController() {
     if (shared_memory != nullptr) {
-        MPI_Win_free(&shared_window);
+        //MPI_Win_free(&shared_window);
     }
 }
 
@@ -70,11 +70,27 @@ void TrafficController::run_simulation(int iterations) {
         }
         
         // Add random vehicles
-        if (dist(rng) < 0.3) { // 30% chance of new vehicle
-            VehicleType type = (dist(rng) < 0.7) ? CAR : WALKER;
-            Vehicle v(iter * size + rank, type, rank * 10, (rank + 1) * 10);
-            add_vehicle(v);
+        int emergency_signal = 0;
+
+        // Only rank 0 decides if emergency happens
+        if (rank == 0 && dist(rng) < 0.05) {
+            emergency_signal = 1;
         }
+
+        // Broadcast decision to ALL ranks
+        MPI_Bcast(&emergency_signal, 1, MPI_INT, 0, MPI_COMM_WORLD);
+
+        // ALL ranks follow the same path
+        if (emergency_signal) {
+            Vehicle ambulance(1000 + iter, AMBULANCE, rank * 10, rank * 10 + 50);
+            handle_emergency(ambulance);
+        }
+
+        // Synchronize after emergency handling
+        MPI_Barrier(MPI_COMM_WORLD);
+
+        // Reset emergency mode safely
+        emergency_mode = false;
         
         // Manage traffic lights
         manage_traffic_lights();
@@ -145,42 +161,27 @@ void TrafficController::process_vehicles() {
 void TrafficController::handle_emergency(const Vehicle& ambulance) {
     emergency_mode = true;
     emergency_queue.push(ambulance);
-    
-    // Broadcast emergency to all processes
-    broadcast_emergency();
-    
-    // Clear path for ambulance
+
+    // Clear path locally
     for (auto& segment : segments) {
         segment.state = EMERGENCY;
     }
-    
+
     if (rank == 0) {
-        std::cout << ">>> EMERGENCY: Ambulance #" << ambulance.id 
+        std::cout << ">>> EMERGENCY: Ambulance #" << ambulance.id
                   << " detected! Clearing path..." << std::endl;
+        std::cout.flush();
     }
-    
+
     // Process emergency vehicle with priority
-    if (!emergency_queue.empty()) {
-        Vehicle amb = emergency_queue.front();
-        emergency_queue.pop();
-        
-        // Add to appropriate segment with highest priority
-        int target_segment = amb.position / 10 % segments.size();
-        if (target_segment < segments.size()) {
-            segments[target_segment].vehicles.insert(
-                segments[target_segment].vehicles.begin(), amb
-            );
-        }
-    }
-    
-    // Reset emergency mode after some time
-    MPI_Barrier(MPI_COMM_WORLD);
-    emergency_mode = false;
-    
-    for (auto& segment : segments) {
-        if (segment.state == EMERGENCY) {
-            segment.state = GREEN;
-        }
+    Vehicle amb = emergency_queue.front();
+    emergency_queue.pop();
+
+    int target_segment = amb.position / 10 % segments.size();
+    if (target_segment < segments.size()) {
+        segments[target_segment].vehicles.insert(
+            segments[target_segment].vehicles.begin(), amb
+        );
     }
 }
 
@@ -256,14 +257,14 @@ void TrafficController::synchronize_processes() {
 }
 
 // Broadcast emergency signal to all processes
-void TrafficController::broadcast_emergency() {
-    int emergency_signal = emergency_mode ? 1 : 0;
-    MPI_Bcast(&emergency_signal, 1, MPI_INT, 0, MPI_COMM_WORLD);
+// void TrafficController::broadcast_emergency() {
+//     int emergency_signal = emergency_mode ? 1 : 0;
+//     MPI_Bcast(&emergency_signal, 1, MPI_INT, 0, MPI_COMM_WORLD);
     
-    if (rank != 0) {
-        emergency_mode = (emergency_signal == 1);
-    }
-}
+//     if (rank != 0) {
+//         emergency_mode = (emergency_signal == 1);
+//     }
+// }
 
 // Gather statistics from all processes
 void TrafficController::gather_statistics() {
@@ -329,4 +330,14 @@ void TrafficController::print_statistics() {
 // Calculate speedup based on Amdahl's Law
 double TrafficController::calculate_speedup(double serial_time, double parallel_time) {
     return serial_time / parallel_time;
+}
+
+
+void TrafficController::cleanup() {
+    MPI_Barrier(MPI_COMM_WORLD);
+
+    if (shared_window != MPI_WIN_NULL) {
+        MPI_Win_free(&shared_window);
+        shared_window = MPI_WIN_NULL;
+    }
 }

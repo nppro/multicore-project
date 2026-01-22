@@ -67,7 +67,9 @@ int main(int argc, char** argv) {
         
         std::cout << "==========================" << std::endl;
     }
-    
+    // ✅ FREE MPI RESOURCES FIRST
+    controller.cleanup();
+
     // Finalize MPI
     MPI_Finalize();
     
